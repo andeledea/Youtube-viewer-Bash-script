@@ -6,7 +6,8 @@ unset PATH
 export PATH=$PATH:/usr/bin/:~/.local/bin:~/my\ scripts
 rm -rf $imputdir 
 
-player="/usr/bin/mpv   --really-quiet " 
+player="/usr/bin/mpv --really-quiet -border=no"
+#player="/bin/vlc"
 imageviewer="tiv" #-h 40 -w 40  "
 
 #sandbox=/bin/firejail 
@@ -123,8 +124,8 @@ echo "$@" >> $HOME/.config/"youtube bash script/history"
 
 while [  $re != q  ]
 do
-startup_name
-read input1 ;
+# startup_name
+read -p "Insert query: " input1 ;
 x="$input1"
 clear
 
@@ -194,7 +195,14 @@ echo ""
 
 #$HOME/my\ scripts/mpdl.sh "$watchlink$q"
 
-$sandbox  youtube-dl  -q --user-agent "$useragent"  -c  "$watchlink$q" -o - |   $player   -
+# list quality
+echo ""
+$sandbox youtube-dl -F "$watchlink$q"
+
+echo ""
+read -p "Choose quality number: " qual ;
+
+$sandbox  youtube-dl -f $qual -q --user-agent "$useragent"  -c  "$watchlink$q" -o - |   $player   -
 history "$show_title: $watchlink$q "
 mpv=1 # for conflict
 #clear
