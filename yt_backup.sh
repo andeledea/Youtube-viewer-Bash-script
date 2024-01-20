@@ -42,15 +42,15 @@ Options:
 " 
       ;;
   --history)
-if      [ -d ~/.config/youtube_bash_script ] &&  [ -f  ~/.config/youtube_bash_script/history ]  ; then 
-    cat ~/.config/youtube_bash_script/history
+if      [ -d ~/.config/youtube\ bash\ script ] &&  [ -f  ~/.config/youtube\ bash\ script/history ]  ; then 
+    cat ~/.config/"youtube bash script/history"
 else  
     echo " No history to show "
     fi
       ;;  
   --clear)
-if      [ -f  ~/.config/youtube_bash_script/history ]  ; then 
-    rm  ~/.config/youtube_bash_script/history
+if      [ -f  ~/.config/youtube\ bash\ script/history ]  ; then 
+    rm  ~/.config/"youtube bash script/history"
     fi
       ;;  
 
@@ -71,7 +71,6 @@ imputfile=$HOME/.ytimgs
 cleaning_cache
 clear
 re=1
-xx=10
 #redo"
 
 ###################################################
@@ -82,10 +81,11 @@ xx=10
 
 function parsing() 
 {
-echo searching $x $1
-yt-dlp ytsearch$1:"$x" --get-id --get-title --skip-download --no-check-certificate --flat-playlist > /tmp/.ytcache
-awk '!(NR%2) {print $0}' /tmp/.ytcache > /tmp/.ytlink 
-awk '(NR%2) {print $0}' /tmp/.ytcache > /tmp/.ytname 
+## name
+cat /tmp/.ytcache   | grep '{"accessibilityData":{"label":"' -F  | sed 's/"}],"accessibility":{"accessibilityData":{"label":"/\n/g' | cut -d' ' -f1-10  | tail -n +2   > /tmp/.ytname
+## link
+cat /tmp/.ytcache  | grep '","webPageType' | sed 's/\",\"webPageType/\n/g'  | grep watch?v | sed 's/.*\/watch?v=//g' | cut -d' ' -f1   > /tmp/.ytlink
+
 }
 
 function clearing_cache()
@@ -95,7 +95,6 @@ rm -rf /tmp/.ytlink
 rm -rf /tmp/.ytname
 rm -rf $imputfile
 }
-
 function startup_name() {
 echo $($color1)  "*********youtube script **********$(tput sgr 0)"
 echo $($color2)  "                 by alan sarkar$(tput sgr 0)"
@@ -114,9 +113,11 @@ fi
 }
 
 function history() {
-[ ! -d  $HOME/.config/youtube_bash_script ]  && mkdir $HOME/.config/youtube_bash_script/;
+[ ! -d  $HOME/.config/"youtube bash script" ]  && touch $HOME/.config/"youtube bash script" ;
 
-echo "$@" >> $HOME/.config/youtube_bash_script/history
+echo "$@" >> $HOME/.config/"youtube bash script/history"
+ 
+
 }
 
 #########################
@@ -142,7 +143,7 @@ re2=1
 while [ $re2 -eq 1 ]
 do
 y=1
-parsing $xx
+parsing
 z=$(cat /tmp/.ytname | wc -l ) 
 
 while [ $y  -le $z ]
@@ -159,7 +160,7 @@ done
 
 
 echo $($color3)  "Enter the number you want to watch or enter q to exit $(tput sgr 0)"
-echo  "$($color3) Enter n to search more results"$(tput sgr 0)
+echo  "$($color3) Enter n to go to other pages"$(tput sgr 0)
 read input2 ;
 p="$input2" ;
 
@@ -196,12 +197,12 @@ echo ""
 
 # list quality
 echo ""
-$sandbox yt-dlp -F "$watchlink$q"
+$sandbox youtube-dl -F "$watchlink$q"
 
 echo ""
 read -p "Choose quality number: " qual ;
 
-$sandbox  yt-dlp -f $qual -q --user-agent "$useragent"  -c  "$watchlink$q" -o - |   $player   -
+$sandbox  youtube-dl -f $qual -q --user-agent "$useragent"  -c  "$watchlink$q" -o - |   $player   -
 history "$show_title: $watchlink$q "
 mpv=1 # for conflict
 #clear
@@ -220,7 +221,7 @@ fi
 ######## next page   ######
 if [ "$p" = n ] 
 then
-echo $(tput sgr 15)"Enter the number$(tput sgr 0)"
+echo $(tput sgr 15)"Enter the page number$(tput sgr 0)"
 read input3
 xx="$input3"
 
@@ -230,10 +231,13 @@ if [ "$xx" != 1 ] && [[ "$xx" =~ ^[0-9]+$ ]]
 then
 xyz="`echo "$x" | sed 's/ /+/g'`"
 echo "$( $sandbox_flag  $scraper_flag  "$searchlink"$xyz"&pbjreload=101&page=$xx" )"       > /tmp/.ytcache
+parsing
 # image_parsing
 page=$(cat /tmp/.ytname  | head -$xx | tail -1 )
 rage="$x&sp$page"
-
+echo $($color2)"page no $(expr $xx + 1)$(tput sgr 0)"
+echo "URL: $searchlink="$rage" "
+echo ""
 fi
 
 fi 
