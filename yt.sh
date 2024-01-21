@@ -12,14 +12,7 @@ imageviewer="tiv" #-h 40 -w 40  "
 
 #sandbox=/bin/firejail 
 #f='--noroot --private-cache  --quiet  --noroot --nonewprivs    --seccomp  '   ## firejail config for this script
-
-
-scraper="/bin/wget"
-scrap_flag='--user-agent="$useragent"  -qO -   '  #scrap_flag=' -s  -H "User-Agent: $useragent" -A "$useragent" '
-#useragent="`random.exe`"                         
-useragent="Mozilla/5.0 (X11; Linux x86_64; rv:52.9) Gecko/20100101 Firefox/52.9 (Pale Moon)"
 sandbox_flag="$sandbox $f " 
-scraper_flag="$scraper $scrap_flag"
 searchlink="https://youtube.com/results?search_query="
 watchlink="https://www.youtube.com/watch?v="
 
@@ -38,7 +31,6 @@ Options:
     --help                  Show this message and exit
     --history               Shows previous search history
     --clear                 clears search history
-    --image                 enables image
 " 
       ;;
   --history)
@@ -54,7 +46,8 @@ if      [ -f  ~/.config/youtube_bash_script/history ]  ; then
     fi
       ;;  
 
-  ""|--image)
+  "")
+
 ###########################     variables  ##################
 color1="tput setaf 15" #white
 color2='tput setaf 05' #pink
@@ -64,206 +57,127 @@ color5='tput setaf 1'  #red
 color6='tput setaf 14'  
 
  ##  0 disable 1 to enable 
-if [ "$1"  == "--image" ] ;  then imageenable=0 ; else   imageenable=0;  fi  
-#### image folder #####
-imputdir=$HOME/.ytimg
-imputfile=$HOME/.ytimgs
 cleaning_cache
 clear
-re=1
-xx=10
+parsen=10
+exit_loop_flag=1
 #redo"
 
 ###################################################
-
-
 
 ########### function  #############
 
 function parsing() 
 {
-echo searching $x $1
-yt-dlp ytsearch$1:"$x" --get-id --get-title --skip-download --no-check-certificate --flat-playlist > /tmp/.ytcache
-awk '!(NR%2) {print $0}' /tmp/.ytcache > /tmp/.ytlink 
-awk '(NR%2) {print $0}' /tmp/.ytcache > /tmp/.ytname 
+    exit_loop_flag=1
+    while [ $exit_loop_flag = 1 ]
+    do
+        y=1
+        echo searching $queryname $parsen
+        yt-dlp ytsearch$parsen:"$queryname" --get-id --get-title --skip-download --no-check-certificate --flat-playlist > /tmp/.ytcache
+        awk '!(NR%2) {print $0}' /tmp/.ytcache > /tmp/.ytlink 
+        awk '(NR%2) {print $0}' /tmp/.ytcache > /tmp/.ytname
+
+        while [ $y  -le $parsen ]
+        do
+            printf  " $($color3) $y. "
+            ## echo  name
+            echo $($color4)  "$(cat /tmp/.ytname  |head -$y | tail -1)$(tput sgr 0)"
+            ## echo link : 
+            cat /tmp/.ytlink | head -$y | tail -1
+
+            y=$( expr $y + 1 )
+        done
+
+        echo $($color3)  "Enter the number you want to watch or enter q to exit $(tput sgr 0)"
+        echo  "$($color3) Enter n to search more results"$(tput sgr 0)
+        read query_video_n ;
+        p="$query_video_n" ;
+
+        if [[ "$p" != q ]] && [[ "$p" != n ]] && [[ "$p" =~ ^[0-9]+$ ]]
+        then
+            videoid=$(cat /tmp/.ytlink | head -$p | tail -1 )
+            show_title="`cat /tmp/.ytname | head -$p | tail -1`"
+            mpv=1 # for conflict
+            exit_loop_flag=2
+        fi
+        ########################
+        ## exit ##
+        if [ "$p" = q ] 
+        then
+            exit_loop_flag=0
+            clearing_cache
+        fi
+
+        ######## NEW RESULTS ######
+        if [ "$p" = n ] 
+        then
+            echo $(tput sgr 15)"Enter the number$(tput sgr 0)"
+            read input3
+            parsen="$input3"
+        fi 
+        mpv=0 # reset conflict var
+    done
 }
 
 function clearing_cache()
 {
-rm -rf /tmp/.ytcache
-rm -rf /tmp/.ytlink
-rm -rf /tmp/.ytname
-rm -rf $imputfile
-}
-
-function startup_name() {
-echo $($color1)  "*********youtube script **********$(tput sgr 0)"
-echo $($color2)  "                 by alan sarkar$(tput sgr 0)"
-echo $($color1)  "*********************************$(tput sgr 0)"
-echo $($color3)  " Enter what you want to search:$(tput sgr 0)"
-}
-
-function image_parsing()
-{
-if [ -d $imputdir  ] 
-then
-    ypeg=$(expr $y - 1 ) 
-if [ $y -eq 1 ];  then  $imageviewer "$imputdir/$(cat $imputfile | cut -c 36-50  | head -1 | tail -1)";  
-else $imageviewer "$imputdir/$(cat $imputfile | cut -c 36-50  | head -$y | tail -1).$ypeg";  fi 
-fi
+    rm -rf /tmp/.ytcache
+    rm -rf /tmp/.ytlink
+    rm -rf /tmp/.ytname
+    rm -rf $imputfile
 }
 
 function history() {
-[ ! -d  $HOME/.config/youtube_bash_script ]  && mkdir $HOME/.config/youtube_bash_script/;
+    [ ! -d  $HOME/.config/youtube_bash_script ]  && mkdir $HOME/.config/youtube_bash_script/;
 
-echo "$@" >> $HOME/.config/youtube_bash_script/history
+    echo "$@" >> $HOME/.config/youtube_bash_script/history
 }
 
-#########################
+function showvideo() { # videoid
+    echo $($color1)  " Now Playing: "
+    echo " "
+    echo $($color4)  "$show_title$(tput sgr 0)"
+    echo $($color4)  "$(echo "Link: "$watchlink"$videoid")$(tput sgr 0)"
 
-while [  $re != q  ]
+    #####  video play ###########
+
+    # list quality
+    echo ""
+    $sandbox yt-dlp -F "$watchlink$videoid"
+
+    echo ""
+    read -p "Choose quality number: " qual ;
+
+    $sandbox  yt-dlp -f $qual -q --user-agent "$useragent"  -c  "$watchlink$videoid" -o - |   $player -
+    history "$show_title: $watchlink$videoid"
+}
+########## end functions ###############
+########## START PROGRAM ###############
+queryname=1 
+while [  $queryname != q  ]
 do
-# startup_name
-read -p "Insert query: " input1 ;
-x="$input1"
-clear
-
-##########   pulling name ######   
-xyz="`echo "$x" | sed 's/ /+/g'`"
-echo "$( $sandbox_flag  $scraper_flag  "$searchlink"$xyz"&spfreeload=10")" > /tmp/.ytcache 
-
-#### imagescrape 
-#if [ $imageenable  -eq 1 ] ;  then mkdir $imputdir ; fi 
-cat /tmp/.ytcache | sed 's/thumb/\n/g'  | grep jpg | cut -c 17-64 | uniq -u | grep http   |sed 's/jpg.*/jpg/g' > "$imputfile"
-if [ $imageenable  -eq 1 ] ; then $sandbox_flag  /usr/bin/wget --user-agent="$useragent" -q   --input-file=$imputfile -P  $imputdir/  ;  fi 
-
-re2=1
-
-while [ $re2 -eq 1 ]
-do
-y=1
-parsing $xx
-z=$(cat /tmp/.ytname | wc -l ) 
-
-while [ $y  -le $z ]
-do
-printf  " $($color3) $y. "
-## echo  name
-echo $($color4)  "$(cat /tmp/.ytname  |head -$y | tail -1)$(tput sgr 0)"
-## echo link : 
-cat /tmp/.ytlink | head -$y | tail -1
-
-# image_parsing
-y=$( expr $y + 1 )
-done
-
-
-echo $($color3)  "Enter the number you want to watch or enter q to exit $(tput sgr 0)"
-echo  "$($color3) Enter n to search more results"$(tput sgr 0)
-read input2 ;
-p="$input2" ;
-
-if [ "$p" != n ] ;then clear ;  fi
-
-
-
-
-if [[ "$p" != q ]] && [[ "$p" != n ]] && [[ "$p" =~ ^[0-9]+$ ]]
-then
-q=$(cat /tmp/.ytlink | head -$p | tail -1 )
-clear
-
-show_title="`cat /tmp/.ytname | head -$p | tail -1`"
-echo $($color1)  " Now Playing: "
-echo " "
-echo $($color4)  "$show_title$(tput sgr 0)"
-echo $($color4)  "$(echo "Link: "$watchlink"$q")$(tput sgr 0)"
-
-echo " "
-echo $($color1)  " Description: $(tput sgr 0)"
-
-
-##################        discreaption ######################
-
-echo $($color6)  "$( $sandbox_flag  $scraper_flag  "$watchlink$q" |  grep '},\"description\":{\"simpleText\":\"'  | sed 's/.*},\"description\":{\"simpleText\":\"//g;s/"},"lengthSeconds":".*//g;s/\\n/\n/g'   )$(tput sgr 0)"
-#fi
-echo "" 
-
-
-#####  video play ###########
-
-#$HOME/my\ scripts/mpdl.sh "$watchlink$q"
-
-# list quality
-echo ""
-$sandbox yt-dlp -F "$watchlink$q"
-
-echo ""
-read -p "Choose quality number: " qual ;
-
-$sandbox  yt-dlp -f $qual -q --user-agent "$useragent"  -c  "$watchlink$q" -o - |   $player   -
-history "$show_title: $watchlink$q "
-mpv=1 # for conflict
-#clear
-
-fi
-########################
-## exit ##
-if [ "$p" = q ] 
-then
-clear
-
-re2=0
-clearing_cache
-fi
-
-######## next page   ######
-if [ "$p" = n ] 
-then
-echo $(tput sgr 15)"Enter the number$(tput sgr 0)"
-read input3
-xx="$input3"
-
-clear
-
-if [ "$xx" != 1 ] && [[ "$xx" =~ ^[0-9]+$ ]] 
-then
-xyz="`echo "$x" | sed 's/ /+/g'`"
-echo "$( $sandbox_flag  $scraper_flag  "$searchlink"$xyz"&pbjreload=101&page=$xx" )"       > /tmp/.ytcache
-# image_parsing
-page=$(cat /tmp/.ytname  | head -$xx | tail -1 )
-rage="$x&sp$page"
-
-fi
-
-fi 
-####################### 
-
-#############  search again ##############
-if  (([ "$p" != n ] && [ "$p" != q  ]) && [ "$mpv" != 1 ])
-then
-    pqr=="`echo "$p" | sed 's/ /+/g'`"
-echo "$( $sandbox_flag  $scraper_flag  "$searchlink"$pqr"&spfreeload=10")"      > /tmp/.ytcache
-rm -rf $imputdir
-
-#### imagescrape 
-#if [ $imageenable  -eq 1 ] ;  then mkdir $imputdir ; fi 
-cat /tmp/.ytcache | sed 's/thumb/\n/g'  | grep jpg | cut -c 17-64 | uniq -u | grep http   |sed 's/jpg.*/jpg/g' > "$imputfile"
-if [ $imageenable  -eq 1 ] ; then $sandbox_flag  $scraper_flag -q   --input-file=$imputfile -P  $imputdir/  ;  fi 
-#########
-
-x="$p"
-fi
-
-#######################
-
-mpv=0 # reset conflict var
-
-#clear
-done
-clear
+    # startup_name
+    read -p "Insert query: " queryname ;
+    if [[ $queryname = *'watch'* ]]; then
+        echo 'This is a video link!'
+        queryname=$(echo $queryname | cut -d '&' -f 1)
+        parsing
+        if [ $exit_loop_flag -eq 2 ]; then 
+            showvideo 
+        fi
+    elif [[ $queryname = *'playlist'* ]]; then
+        echo 'This is a playlist link!'
+        queryname=$(echo $queryname | cut -d '&' -f 1)
+        yt-dlp --flat-playlist $queryname -j | jq -r .url
+        # TODO : implement recursive search in playlist
+    else
+        parsing
+        if [ $exit_loop_flag -eq 2 ]; then 
+            showvideo 
+        fi
+    fi
 done
 clearing_cache
-      ;;
+;;
 esac
-
