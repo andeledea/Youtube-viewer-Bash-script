@@ -4,7 +4,6 @@ unalias -a
 #unset  $GROUPS
 unset PATH
 export PATH=$PATH:/usr/bin/:~/.local/bin:~/my\ scripts
-rm -rf $imputdir 
 
 player="/usr/bin/mpv --really-quiet -border=no"
 #player="/bin/vlc"
@@ -159,12 +158,26 @@ function parsingfzf()
     done
 }
 
+function playplaylist()
+{
+    list=$(yt-dlp --flat-playlist $queryname -j | jq -r .url)
+    qual=18
+    while IFS= read -r line; do
+        echo "Playing $line"
+        
+        show_title="Playlist video"
+        videoid=${line#*=}
+        mpv=1
+        showvideo
+    done <<< "$list"
+    mpv=0
+}
+
 function clearing_cache()
 {
-    rm -rf /tmp/.ytcache
-    rm -rf /tmp/.ytlink
-    rm -rf /tmp/.ytname
-    rm -rf $imputfile
+    rm -f /tmp/.ytcache
+    rm -f /tmp/.ytlink
+    rm -f /tmp/.ytname
 }
 
 function history() {
@@ -184,21 +197,24 @@ function showvideo() { # videoid
     # list quality
     echo ""
     $sandbox yt-dlp -F "$watchlink$videoid"
-
-    echo ""
-    read -p "Choose quality number: " qual ;
+    
+    if [ $playlistflag = 0 ]; then
+        echo ""
+        read -p "Choose quality number: " qual ;
+    fi
 
     $sandbox  yt-dlp -f $qual -q --user-agent "$useragent"  -c  "$watchlink$videoid" -o - |   $player -
     history "$show_title: $watchlink$videoid"
 }
 ########## end functions ###############
 ########## START PROGRAM ###############
-queryname=1 
+queryname=1
 while [  $queryname != q  ]
 do
     # startup_name
     read -p "Insert query: " queryname ;
-    if [[ $queryname = *'watch'* ]]; then
+if [[ $queryname = *'watch'* ]]; then
+        playlistflag=0
         echo 'This is a video link!'
         queryname=$(echo $queryname | cut -d '&' -f 1)
         parsingfzf
@@ -206,10 +222,14 @@ do
             showvideo 
         fi
     elif [[ $queryname = *'playlist'* ]]; then
+        playlistflag=1
         echo 'This is a playlist link!'
         queryname=$(echo $queryname | cut -d '&' -f 1)
         # TODO : implement recursive search in playlist
+        playplaylist
+        
     else
+        playlistflag=0
         parsingfzf
         if [ $exit_loop_flag -eq 2 ]; then 
             showvideo 
