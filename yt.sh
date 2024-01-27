@@ -94,6 +94,7 @@ function parsing()
         read query_video_n ;
         p="$query_video_n" ;
 
+
         if [[ "$p" != q ]] && [[ "$p" != n ]] && [[ "$p" =~ ^[0-9]+$ ]]
         then
             videoid=$(cat /tmp/.ytlink | head -$p | tail -1 )
@@ -110,6 +111,44 @@ function parsing()
         fi
 
         ######## NEW RESULTS ######
+        if [ "$p" = n ] 
+        then
+            echo $(tput sgr 15)"Enter the number$(tput sgr 0)"
+            read input3
+            parsen="$input3"
+        fi 
+        mpv=0 # reset conflict var
+    done
+}
+
+function parsingfzf() 
+{
+    exit_loop_flag=1
+    while [ $exit_loop_flag = 1 ]
+    do
+        y=1
+        echo searching fzf $queryname $parsen
+        yt-dlp ytsearch$parsen:"$queryname" --get-id --get-title --skip-download --no-check-certificate --flat-playlist > /tmp/.ytcache
+        awk '!(NR%2) {print $0}' /tmp/.ytcache > /tmp/.ytlink 
+        awk '(NR%2) {print $0}' /tmp/.ytcache > /tmp/.ytname
+
+        p=$(cat -n /tmp/.ytname | fzf --reverse --with-nth 2.. | awk '{print $1}')
+        
+        if [[ "$p" != q ]] && [[ "$p" != n ]] && [[ "$p" =~ ^[0-9]+$ ]]
+        then
+            videoid=$(cat /tmp/.ytlink | head -$p | tail -1 )
+            show_title="`cat /tmp/.ytname | head -$p | tail -1`"
+            mpv=1 # for conflict
+            exit_loop_flag=2
+        fi
+        echo $show_title $videoid
+
+        if [ "$p" = q ] 
+        then
+            exit_loop_flag=0
+            clearing_cache
+        fi
+
         if [ "$p" = n ] 
         then
             echo $(tput sgr 15)"Enter the number$(tput sgr 0)"
@@ -162,17 +201,16 @@ do
     if [[ $queryname = *'watch'* ]]; then
         echo 'This is a video link!'
         queryname=$(echo $queryname | cut -d '&' -f 1)
-        parsing
+        parsingfzf
         if [ $exit_loop_flag -eq 2 ]; then 
             showvideo 
         fi
     elif [[ $queryname = *'playlist'* ]]; then
         echo 'This is a playlist link!'
         queryname=$(echo $queryname | cut -d '&' -f 1)
-        yt-dlp --flat-playlist $queryname -j | jq -r .url
         # TODO : implement recursive search in playlist
     else
-        parsing
+        parsingfzf
         if [ $exit_loop_flag -eq 2 ]; then 
             showvideo 
         fi
